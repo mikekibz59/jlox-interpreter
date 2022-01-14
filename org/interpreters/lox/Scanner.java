@@ -8,6 +8,8 @@ import static org.interpreters.lox.TokenType.*;
 
 interface ScannerInterface {
   public List<Token> scanTokens();
+
+  char NULL_TERMINATOR = '\0';
 }
 
 public class Scanner implements ScannerInterface {
@@ -71,7 +73,11 @@ public class Scanner implements ScannerInterface {
         addToken(SEMICOLON);
         break;
       case '*':
-        addToken(STAR);
+        if (match('*')) {
+          addToken(STAR_STAR);
+        } else {
+          addToken(STAR);
+        }
         break;
       case '!':
         addToken(match('=') ? BANG_EQUAL : BANG);
@@ -85,8 +91,11 @@ public class Scanner implements ScannerInterface {
       case '>':
         addToken(match('=') ? GREATER_EQUAL : GREATER);
         break;
+      // We don't need to add comments to be parsed.
       case '/':
-        if (match('/')) {
+        // this if case checks for either single
+        // or multiline comments
+        if (match('/') || match('*')) {
           while (peek() != '\n' && !isAtEnd())
             advance();
         } else {
@@ -100,7 +109,9 @@ public class Scanner implements ScannerInterface {
       case '\n':
         line++;
         break;
-
+      case '"':
+        string();
+        break;
       default:
         Lox.error(line, "Unexpected Character.");
         break;
@@ -129,8 +140,23 @@ public class Scanner implements ScannerInterface {
     tokens.add(new Token(type, text, literal, line));
   }
 
+  private void string() {
+    while (peek() != '"' && !isAtEnd()) {
+      if (peek() == '\n')
+        line++;
+      advance();
+    }
+    if (isAtEnd()) {
+      Lox.error(line, "Unterminated string.");
+      return;
+    }
+    advance();
+    String value = source.substring(start + 1, current - 1);
+    addToken(STRING, value);
+  }
+
   private boolean match(char expected) {
-    // used to peek into the next character after getting a hold
+    // used to match into the next character after getting a hold
     // of the current one.
 
     if (isAtEnd())
@@ -141,9 +167,17 @@ public class Scanner implements ScannerInterface {
     return true;
   }
 
+  /**
+   * Custom private method that return the [current] idx
+   * element. If it reaches the end of a stream or data,
+   * It will return the null termination character sequence.
+   * In this case, "\0"
+   * 
+   * @return String
+   */
   private char peek() {
     if (isAtEnd())
-      return '\0';
+      return NULL_TERMINATOR;
     return source.charAt(current);
   }
 }
